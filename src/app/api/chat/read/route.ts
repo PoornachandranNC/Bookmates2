@@ -38,6 +38,15 @@ export async function POST(req: NextRequest) {
 		const { error: updErr } = await q;
 		if (updErr) return new Response(JSON.stringify({ error: updErr.message }), { status: 500 });
 
+		// Also update conversation-level last_read marker so inbox badges clear correctly
+		const { error: convUpdErr } = await supabase
+			.from('conversations')
+			.update(isBuyer ? { buyer_last_read_at: ts } : { seller_last_read_at: ts })
+			.eq('id', conversation_id);
+		if (convUpdErr) {
+			return new Response(JSON.stringify({ error: convUpdErr.message }), { status: 500 });
+		}
+
 		return new Response(JSON.stringify({ success: true, marked_at: ts }), { status: 200 });
 	} catch (e) {
 		return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });

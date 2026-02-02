@@ -66,6 +66,23 @@ export default function ListBookPage() {
     setError("");
     setSuccess(false);
     try {
+      const priceValue = Number(form.price);
+      if (!Number.isFinite(priceValue) || priceValue <= 0) {
+        throw new Error("Price should be in positive");
+      }
+
+      // Sanitize ISBNs and enforce exact lengths when provided
+      const primary = (form.isbn_primary || "").replace(/[^0-9Xx]/g, "").toUpperCase();
+      const secondary = (form.isbn_secondary || "").replace(/[^0-9Xx]/g, "").toUpperCase();
+
+      if (primary && primary.length !== 13) {
+        throw new Error("Primary ISBN (ISBN-13) must be exactly 13 characters.");
+      }
+
+      if (secondary && secondary.length !== 10) {
+        throw new Error("Secondary ISBN (ISBN-10) must be exactly 10 characters.");
+      }
+
       let imageUrl = "";
       if (imageFile) {
         // Upload to Cloudinary
@@ -85,11 +102,9 @@ export default function ListBookPage() {
           throw new Error(cloudError);
         }
         imageUrl = result.secure_url;
-      }
-  // Google Books API verification
-  let status = asDraft ? "draft" : "pending";
-      const primary = (form.isbn_primary || '').replace(/[^0-9Xx]/g, '').toUpperCase();
-      const secondary = (form.isbn_secondary || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+        }
+      // Google Books API verification
+      let status = asDraft ? "draft" : "pending";
       const isbnToTry = [primary, secondary].filter(Boolean);
       if (isbnToTry.length > 0) {
         const useIsbn = isbnToTry[0];
@@ -111,7 +126,7 @@ export default function ListBookPage() {
       // Store in Supabase
       const bookPayload = {
         ...form,
-        price: Number(form.price),
+        price: priceValue,
         original_price: form.original_price ? Number(form.original_price) : null,
         images: imageUrl ? [imageUrl] : [],
         status,
@@ -193,11 +208,24 @@ export default function ListBookPage() {
             </div>
             <div className="mb-4">
               <label className="block text-black mb-2">Price</label>
-              <input type="number" name="price" value={form.price} onChange={handleChange} required className="w-full px-3 py-2 border rounded text-black" />
+              <input
+                type="text"
+                name="price"
+                value={form.price}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border rounded text-black"
+              />
             </div>
             <div className="mb-4">
               <label className="block text-black mb-2">Original Price (optional)</label>
-              <input type="number" name="original_price" value={form.original_price} onChange={handleChange} className="w-full px-3 py-2 border rounded text-black" />
+              <input
+                type="text"
+                name="original_price"
+                value={form.original_price}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded text-black"
+              />
             </div>
             <div className="mb-4">
               <label className="block text-black mb-2">College Name / Location</label>

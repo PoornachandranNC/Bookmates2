@@ -8,8 +8,10 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: NextRequest) {
-  const { email, otp } = await req.json();
-  if (!email || !otp) return new Response(JSON.stringify({ error: 'Missing email or OTP' }), { status: 400 });
+  const { email, otp, password, name, phone, college } = await req.json();
+  if (!email || !otp || !password) {
+    return new Response(JSON.stringify({ error: 'Missing email, OTP, or password' }), { status: 400 });
+  }
   // Find OTP in DB
   const { data, error } = await supabaseAdmin
     .from('otps')
@@ -28,37 +30,34 @@ export async function POST(req: NextRequest) {
     // Delete OTP after verification
     await supabaseAdmin.from('otps').delete().eq('email', email);
     
-    // Confirm user's email in Supabase Auth
+    // Create the Supabase Auth user ONLY after successful OTP verification
     try {
-      // Get user by email
-      const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-      
-      if (listError) {
-        console.error('Error listing users:', listError);
-      } else {
-        const user = users.users.find(u => u.email === email);
-        
-        if (user) {
-          // Confirm the user's email
-          const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-            email_confirm: true
-          });
-          
-          if (updateError) {
-            console.error('Error confirming user email:', updateError);
-          } else {
-            console.log('User email confirmed successfully for:', email);
-          }
-        } else {
-          console.log('User not found for email:', email);
-        }
+      const phoneDigits = String(phone || '').replace(/\D/g, '');
+      const { data: user, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          name: name || null,
+          phone: phoneDigits || null,
+          college: college || null,
+        },
+      });
+
+      if (createError) {
+        console.error('Error creating user after OTP verification:', createError);
+        return new Response(
+          JSON.stringify({ error: createError.message || 'Failed to create user after OTP verification' }),
+          { status: 400 }
+        );
       }
-    } catch (error) {
-      console.error('Error in email confirmation process:', error);
-      // Continue anyway, as OTP was valid
+
+      console.log('User created successfully after OTP verification for:', email, 'id:', user?.user?.id);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } catch (err: any) {
+      console.error('Unexpected error while creating user after OTP verification:', err);
+      return new Response(JSON.stringify({ error: 'Failed to create user after OTP verification' }), { status: 500 });
     }
-    
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
   }
   return new Response(JSON.stringify({ error: 'Invalid OTP' }), { status: 401 });
 }

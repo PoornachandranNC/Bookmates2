@@ -54,24 +54,7 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    // Prevent duplicate listings by the same user for the same ISBN (primary or secondary)
-    const normPrimary = (book.isbn_primary || '').replace(/[^0-9Xx]/g, '').toUpperCase();
-    const normSecondary = (book.isbn_secondary || '').replace(/[^0-9Xx]/g, '').toUpperCase();
-    if (book.user_id && (normPrimary || normSecondary)) {
-      // NOTE: legacy `isbn` column may be missing in some DB instances.
-      // To avoid runtime errors while schema is fixed, only check the
-      // consolidated isbn_primary and isbn_secondary fields here.
-      const { data: dupCheck, error: dupErr } = await supabaseAdmin
-        .from('books')
-        .select('id')
-        .eq('user_id', book.user_id)
-        .or(`isbn_primary.eq.${normPrimary},isbn_primary.eq.${normSecondary},isbn_secondary.eq.${normPrimary},isbn_secondary.eq.${normSecondary}`)
-        .limit(1);
-      if (!dupErr && dupCheck && dupCheck.length > 0) {
-        return new Response(JSON.stringify({ error: 'You already have a listing for this ISBN.' }), { status: 409 });
-      }
-    }
-  const isbnCandidates = [book.isbn_primary, book.isbn_secondary].filter(Boolean);
+    const isbnCandidates = [book.isbn_primary, book.isbn_secondary].filter(Boolean);
     if (isbnCandidates.length > 0) {
       const rawIsbn = String(isbnCandidates[0] || '');
       const sanitizedIsbn = rawIsbn.replace(/[^0-9Xx]/g, '').toUpperCase();

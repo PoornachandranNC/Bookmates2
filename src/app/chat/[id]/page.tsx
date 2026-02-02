@@ -184,7 +184,12 @@ export default function ChatPage() {
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`
         }, (payload) => {
-          setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+          // Preserve already-decrypted content from state; only update metadata/read flags
+          setMessages(prev => prev.map(m => {
+            if (m.id !== payload.new.id) return m;
+            const { content: _ignored, ...restNew } = payload.new as any;
+            return { ...m, ...restNew };
+          }));
         })
         .subscribe();
 

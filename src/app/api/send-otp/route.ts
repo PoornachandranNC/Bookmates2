@@ -7,6 +7,9 @@ export async function POST(req: NextRequest) {
   const { email, otp } = await req.json();
   if (!email || !otp) return new Response(JSON.stringify({ error: 'Missing email or OTP' }), { status: 400 });
   
+
+  // For debug : Login 
+  
   console.log('Attempting to send OTP to:', email);
   console.log('EMAIL_USER:', process.env.EMAIL_USER);
   console.log('EMAIL_APP_PASSWORD available:', !!process.env.EMAIL_APP_PASSWORD);

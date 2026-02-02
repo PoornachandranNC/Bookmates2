@@ -58,12 +58,13 @@ export default function Navbar() {
             <div className="flex items-center gap-4">
               <NotificationComponent onNotificationClick={handleNotificationClick} />
               {givenName && (
-                <span
+                <Link
+                  href="/profile"
                   className="text-indigo-600 font-medium drop-shadow-[0_0_6px_rgba(79,70,229,0.4)] hover:text-indigo-700 hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.65)] transition-colors transition-shadow duration-200"
                   title={givenName}
                 >
                   {givenName}
-                </span>
+                </Link>
               )}
               <Button
                 variant="secondary"

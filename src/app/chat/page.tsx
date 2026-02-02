@@ -11,21 +11,51 @@ export default function ConversationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
+  const refreshConversationsForUser = async (uid: string) => {
+    try {
+      const res = await fetch(`/api/chat/conversations?user_id=${uid}`);
+      if (!res.ok) {
+        setError('Failed to load conversations');
+        return;
+      }
+      const data = await res.json();
+      const baseConvs: any[] = data.conversations || [];
+
+      const enriched = await Promise.all(
+        baseConvs.map(async (conv: any) => {
+          const otherId = uid === conv.buyer_user_id ? conv.seller_user_id : conv.buyer_user_id;
+          let otherName = 'Unknown User';
+          if (otherId) {
+            try {
+              const uRes = await fetch(`/api/users/${otherId}`);
+              if (uRes.ok) {
+                const u = await uRes.json();
+                otherName = (u.name || u.email || 'Unknown User') as string;
+              }
+            } catch {
+              // ignore name fetch errors, fallback remains
+            }
+          }
+          return { ...conv, other_user_name: otherName };
+        })
+      );
+
+      setConversations(enriched);
+    } catch {
+      setError('Failed to load conversations');
+    }
+  };
+
   useEffect(() => {
   const loadConversations = async () => {
       try {
         const { data: userData } = await supabase.auth.getUser();
         setCurrentUser(userData.user);
-    setUserId(userData.user?.id || null);
+    const uid = userData.user?.id || null;
+    setUserId(uid);
 
-        if (userData.user) {
-          const res = await fetch(`/api/chat/conversations?user_id=${userData.user.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            setConversations(data.conversations || []);
-          } else {
-            setError('Failed to load conversations');
-          }
+        if (uid) {
+          await refreshConversationsForUser(uid);
         }
       } catch (err) {
         setError('Failed to load conversations');
@@ -44,29 +74,17 @@ export default function ConversationsPage() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `buyer_user_id=eq.${userId}` }, () => {
         // lightweight refresh
         (async ()=>{
-          const res = await fetch(`/api/chat/conversations?user_id=${userId}`);
-          if (res.ok) {
-            const j = await res.json();
-            setConversations(j.conversations || []);
-          }
+          await refreshConversationsForUser(userId);
         })();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `seller_user_id=eq.${userId}` }, () => {
         (async ()=>{
-          const res = await fetch(`/api/chat/conversations?user_id=${userId}`);
-          if (res.ok) {
-            const j = await res.json();
-            setConversations(j.conversations || []);
-          }
+          await refreshConversationsForUser(userId);
         })();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         (async ()=>{
-          const res = await fetch(`/api/chat/conversations?user_id=${userId}`);
-          if (res.ok) {
-            const j = await res.json();
-            setConversations(j.conversations || []);
-          }
+          await refreshConversationsForUser(userId);
         })();
       })
       .subscribe();
@@ -83,14 +101,21 @@ export default function ConversationsPage() {
     return 0;
   };
 
-  const formatLastMessageTime = (timestamp: string) => {
+  const formatLastMessageTime = (timestamp?: string | null) => {
+    if (!timestamp) return '';
     const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+
     const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = diffMs / (1000 * 60);
+
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${Math.floor(diffMinutes)}m ago`;
+    const diffHours = diffMinutes / 60;
+    if (diffHours < 24) return `${Math.floor(diffHours)}h ago`;
+    const diffDays = diffHours / 24;
+    if (diffDays < 7) return `${Math.floor(diffDays)}d ago`;
     return date.toLocaleDateString();
   };
 
@@ -168,9 +193,9 @@ export default function ConversationsPage() {
                         <h3 className="font-semibold text-black truncate">
                           {conversation.books?.title || 'Unknown Book'}
                         </h3>
-                        <p className="text-sm text-black/80">
-                          <span className="text-black">₹{conversation.books?.price || '0'}</span> • {conversation.books?.author || 'Unknown Author'}
-                        </p>
+                        <h3 className="font-semibold text-black truncate mt-0.5">
+                          {conversation.other_user_name || 'Unknown User'}
+                        </h3>
                         <p className="text-xs text-black/60 mt-1">
                           {conversation.books?.college_name || 'Unknown College'}
                         </p>
@@ -180,12 +205,12 @@ export default function ConversationsPage() {
                           {formatLastMessageTime(conversation.last_message_at)}
                         </p>
                         {unreadCount(conversation) > 0 && (
-                          <span className="inline-flex items-center justify-center text-xs bg-blue-600 text-white rounded-full px-2 py-0.5 mt-1">
-                            {unreadCount(conversation)}
-                          </span>
-                        )}
-                        {conversation.status === 'active' && (
-                          <span className="inline-block w-2 h-2 bg-green-500 rounded-full mt-1"></span>
+                          <>
+                            <span className="inline-flex items-center justify-center text-xs bg-blue-600 text-white rounded-full px-2 py-0.5 mt-1">
+                              {unreadCount(conversation)}
+                            </span>
+                            <span className="inline-block w-2 h-2 bg-green-500 rounded-full mt-1 ml-1"></span>
+                          </>
                         )}
                       </div>
                     </div>

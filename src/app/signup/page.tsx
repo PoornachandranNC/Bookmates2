@@ -1,8 +1,8 @@
 
 "use client";
 import { useState, useEffect } from "react";
-import { signUpWithEmail } from "../../lib/auth";
 import { generateOTP } from "../../lib/otp";
+import { useToast } from "../../components/ToastProvider";
 
 export default function SignupPage() {
   const [form, setForm] = useState({
@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [otp, setOtp] = useState(""); // store generated OTP (demo only)
   const [otpInput, setOtpInput] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
+  const { push } = useToast();
 
   // Clear any autofill data when component mounts
   useEffect(() => {
@@ -43,34 +44,50 @@ export default function SignupPage() {
     setLoading(true);
     setError("");
     try {
-      // 1. Create user in Supabase Auth
-      const { data, error: supabaseError } = await signUpWithEmail({
-        email: form.email,
-        password: form.password,
-        data: {
-          name: form.name,
-          phone: form.phone,
-          college: form.college,
-        },
-      });
-      if (supabaseError) throw new Error(supabaseError.message);
+      // Basic frontend validation
+      const emailTrimmed = form.email.trim();
+      const phoneDigits = form.phone.replace(/\D/g, "");
 
-      // 2. Generate OTP
+      const password = form.password;
+
+      // Email must look like name@provider.com and use an allowed provider
+      // Allowed domains: gmail.com, yahoo.com, outlook.com, hotmail.com, or any *.edu
+      const emailRegex = /^[A-Za-z][A-Za-z0-9._%+-]*@(?:gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|[A-Za-z0-9.-]+\.edu)$/i;
+      if (!emailRegex.test(emailTrimmed)) {
+        throw new Error(
+          "Please enter a valid email from gmail.com, yahoo.com, outlook.com, hotmail.com, or a .edu college domain."
+        );
+      }
+
+      // Phone: exactly 10 digits
+      if (phoneDigits.length !== 10) {
+        throw new Error("Please enter a valid 10-digit phone number.");
+      }
+
+      // Password: at least one lowercase, uppercase, digit, and special character
+      const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./`~]).+$/;
+      if (!passwordPattern.test(password)) {
+        throw new Error(
+          "Password must include at least one lowercase (a-z), one uppercase (A-Z), one digit (0-9), and one special symbol."
+        );
+      }
+
+      // 1. Generate OTP (user is NOT created yet)
       const generatedOtp = generateOTP();
       setOtp(generatedOtp); // store for demo
 
-      // 3. Store OTP server-side
+      // 2. Store OTP server-side
       await fetch("/api/verify-otp", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, otp: generatedOtp }),
+        body: JSON.stringify({ email: emailTrimmed, otp: generatedOtp }),
       });
 
-      // 4. Send OTP to email
+      // 3. Send OTP to email
       const otpRes = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, otp: generatedOtp }),
+        body: JSON.stringify({ email: emailTrimmed, otp: generatedOtp }),
       });
       const otpResult = await otpRes.json();
       if (!otpRes.ok || !otpResult.success) throw new Error(otpResult.error || "Failed to send OTP email");
@@ -86,14 +103,24 @@ export default function SignupPage() {
     e.preventDefault();
     setError("");
     try {
+      const emailTrimmed = form.email.trim();
+      const phoneDigits = form.phone.replace(/\D/g, "");
       const res = await fetch("/api/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, otp: otpInput }),
+        body: JSON.stringify({
+          email: emailTrimmed,
+          otp: otpInput,
+          password: form.password,
+          name: form.name,
+          phone: phoneDigits,
+          college: form.college,
+        }),
       });
       const result = await res.json();
       if (result.success) {
         setOtpVerified(true);
+        push("Signup successful", "success");
         // Clear form data to prevent any issues
         setForm({
           name: "",
