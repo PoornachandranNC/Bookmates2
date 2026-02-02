@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0b0b0b;
+  --brand: #4f46e5; /* indigo-600 */
+  --brand-700: #4338ca; /* indigo-700 */
+  --brand-50: #eef2ff; /* indigo-50 */
+  --accent: #22c55e; /* green-500 */
+  --error: #ef4444; /* red-500 */
+}
+
+/* Theme variables are defined via CSS custom properties above */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Container utility */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 1024px) {
+  .container { max-width: 1120px; }
+}
+
+/* Fade-in animation */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeInUp { animation: fadeInUp 400ms ease-out both; }
+
+/* Toast slide in from the right */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(40px) translateY(0); }
+  to { opacity: 1; transform: translateX(0) translateY(0); }
+}
+@keyframes slideOut {
+  from { opacity: 1; transform: translateX(0) translateY(0); }
+  to { opacity: 0; transform: translateX(40px) translateY(0); }
+}
+.animate-slideIn { animation: slideIn 300ms cubic-bezier(.22,.97,.36,1) both; }
+.animate-slideOut { animation: slideOut 220ms ease-in forwards; }
+
+/* Avoid gray text on white backgrounds by default */
+.text-on-white { color: #0b0b0b; }
+
